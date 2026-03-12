@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import CryptoJS from "crypto-js";
+import { encryptArrayBufferWithKey } from "../crypto/fileEncryption";
 import { getProfilesListDecrypted } from "../api/profileStore";
 
 const makeUi = () => {
@@ -42,103 +43,143 @@ const makeUi = () => {
 };
 
 const EMERGENCY_POST = "http://localhost:5000/emergency";
+const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8 MB
+
+function deriveEmergencyFileKey(nationalId) {
+  return CryptoJS.SHA256(String(nationalId || "")).toString(CryptoJS.enc.Hex);
+}
 
 export default function AddEmergency() {
   const ui = useMemo(() => makeUi(), []);
 
   const [wallet, setWallet] = useState("");
-  const [nationalId, setNationalId] = useState(""); // auto-loaded (no input)
+  const [nationalId, setNationalId] = useState("");
   const [diseases, setDiseases] = useState("");
   const [allergies, setAllergies] = useState("");
+  const [currentMedications, setCurrentMedications] = useState("");
+  const [criticalNote, setCriticalNote] = useState("");
+  const [emergencyFile, setEmergencyFile] = useState(null);
   const [status, setStatus] = useState("");
 
-  // 1) Get wallet + try to auto load National ID from localStorage or backend /profiles
   useEffect(() => {
     const init = async () => {
       const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
       const w = accounts?.[0] || "";
       setWallet(w);
 
-      // A) Prefer cached National ID
       const cached = localStorage.getItem(`nid:${w.toLowerCase()}`) || "";
       if (cached) {
         setNationalId(cached);
       } else {
-        // B) Try backend profiles (optional)
         try {
           const list = await getProfilesListDecrypted();
           const me = list.find((x) => (x?.address || "").toLowerCase() === w.toLowerCase());
           const p = me?.profile || {};
-          const nid =
-            p.nationalId ||
-            p.National_id ||
-            p.nationalID ||
-            p.nid ||
-            "";
+          const nid = p.nationalId || p.National_id || p.nationalID || p.nid || "";
 
           if (nid) {
             setNationalId(String(nid));
             localStorage.setItem(`nid:${w.toLowerCase()}`, String(nid));
           }
         } catch {
-          // ignore: backend might be unavailable
+          // ignore
         }
       }
 
-      // load last saved emergency text (optional)
       const raw = localStorage.getItem(`emergencyLocal:${w.toLowerCase()}`);
       if (raw) {
         try {
           const obj = JSON.parse(raw);
           setDiseases(obj.diseases || "");
           setAllergies(obj.allergies || "");
-        } catch {}
+          setCurrentMedications(obj.currentMedications || "");
+          setCriticalNote(obj.criticalNote || "");
+        } catch {
+          // ignore bad local draft
+        }
       }
     };
 
     init().catch(() => {});
   }, []);
 
-  // keep a light local draft (no button)
   useEffect(() => {
     if (!wallet) return;
     localStorage.setItem(
       `emergencyLocal:${wallet.toLowerCase()}`,
-      JSON.stringify({ diseases, allergies })
+      JSON.stringify({
+        diseases,
+        allergies,
+        currentMedications,
+        criticalNote,
+      })
     );
-  }, [wallet, diseases, allergies]);
+  }, [wallet, diseases, allergies, currentMedications, criticalNote]);
 
   const publish = async () => {
-    // National ID is required for encryption key, but we do NOT ask it in UI anymore
     if (!nationalId) {
       setStatus("");
       return alert("National ID not found in your patient profile. Please update your profile first.");
     }
 
-    const payload = {
-      v: 1,
-      diseases,
-      allergies,
-      updatedAt: Date.now(),
-    };
+    const hasSummary = [diseases, allergies, currentMedications, criticalNote].some((x) => String(x || "").trim());
+    if (!hasSummary && !emergencyFile) {
+      setStatus("");
+      return alert("Please enter emergency information or attach a file.");
+    }
+
+    if (emergencyFile && emergencyFile.size > MAX_FILE_SIZE) {
+      setStatus("");
+      return alert("Emergency attachment is too large. Keep it below 8 MB.");
+    }
 
     try {
-      setStatus("Encrypting emergency info...");
+      setStatus("Preparing emergency data...");
+
+      let file = null;
+      if (emergencyFile) {
+        setStatus("Encrypting emergency attachment...");
+        const fileBuffer = await emergencyFile.arrayBuffer();
+        const fileKeyHex = deriveEmergencyFileKey(nationalId);
+        const fileCiphertext = await encryptArrayBufferWithKey(fileBuffer, fileKeyHex);
+
+        file = {
+          fileName: emergencyFile.name,
+          mimeType: emergencyFile.type || "application/octet-stream",
+          size: emergencyFile.size,
+          ciphertext: fileCiphertext,
+        };
+      }
+
+      const payload = {
+        v: 2,
+        diseases,
+        allergies,
+        currentMedications,
+        criticalNote,
+        file,
+        updatedAt: Date.now(),
+      };
+
+      setStatus("Encrypting emergency package...");
       const ciphertext = CryptoJS.AES.encrypt(JSON.stringify(payload), String(nationalId)).toString();
 
       setStatus("Uploading to backend / Pinata...");
-      const resp = await axios.post(EMERGENCY_POST, { nationalId: String(nationalId), ciphertext });
+      const resp = await axios.post(EMERGENCY_POST, {
+        nationalId: String(nationalId),
+        ciphertext,
+      });
 
       const cid = resp.data?.cid;
       if (cid && wallet) {
         localStorage.setItem(`emergencyCid:${wallet.toLowerCase()}`, cid);
       }
 
-      setStatus("Published ✅ (Doctor can view via Emergency)");
+      setStatus("Published ✅ Emergency summary and attachment saved");
     } catch (e) {
       console.error(e);
       setStatus("❌ Publish failed");
-      alert("Publish failed");
+      alert("Emergency publish failed");
     }
   };
 
@@ -146,7 +187,7 @@ export default function AddEmergency() {
     <div style={{ ...ui.panel, marginTop: 0 }}>
       <div style={ui.panelTitle}>Emergency Information</div>
       <div style={ui.panelSub}>
-        Doctors can access this information in emergencies. (National ID is read automatically from your profile.)
+        Doctors can access this information during emergencies. National ID is read automatically from your profile.
       </div>
 
       <div style={ui.divider} />
@@ -156,9 +197,7 @@ export default function AddEmergency() {
           National ID is not available. Update your patient profile first (or ensure backend /profiles is running).
         </div>
       ) : (
-        <div style={ui.note}>
-          National ID loaded ✅
-        </div>
+        <div style={ui.note}>National ID loaded ✅</div>
       )}
 
       <div style={ui.label}>Chronic Diseases</div>
@@ -174,8 +213,40 @@ export default function AddEmergency() {
         style={ui.input}
         value={allergies}
         onChange={(e) => setAllergies(e.target.value)}
-        placeholder="e.g., Penicillin..."
+        placeholder="e.g., Penicillin, Severe asthma trigger..."
       />
+
+      <div style={ui.label}>Current Medications</div>
+      <input
+        style={ui.input}
+        value={currentMedications}
+        onChange={(e) => setCurrentMedications(e.target.value)}
+        placeholder="e.g., Metformin, Insulin, Aspirin..."
+      />
+
+      <div style={ui.label}>Critical Emergency Note</div>
+      <input
+        style={ui.input}
+        value={criticalNote}
+        onChange={(e) => setCriticalNote(e.target.value)}
+        placeholder="e.g., Contact cardiology first, carries pacemaker..."
+      />
+
+      <div style={ui.label}>Emergency Attachment (optional)</div>
+      <input
+        style={ui.input}
+        type="file"
+        accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.doc,.docx"
+        onChange={(e) => setEmergencyFile(e.target.files?.[0] || null)}
+      />
+
+      {emergencyFile ? (
+        <div style={ui.note}>
+          Selected file: <strong>{emergencyFile.name}</strong> ({Math.ceil(emergencyFile.size / 1024)} KB)
+        </div>
+      ) : (
+        <div style={ui.note}>You can publish text only, file only, or both together.</div>
+      )}
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
         <button style={ui.btnPrimary} onClick={publish}>

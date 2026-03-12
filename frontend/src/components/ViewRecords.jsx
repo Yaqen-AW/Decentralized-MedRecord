@@ -59,17 +59,15 @@ export default function ViewRecords({ records, metaMap, busy, onRefresh }) {
   const viewAndDecrypt = async (rec) => {
     try {
       const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-      const wallet = accounts?.[0];
-      if (!wallet) throw new Error("No wallet connected");
+      const wallet = accounts[0];
 
-      // ✅ v2: async decrypt of AES key using eth_decrypt (MetaMask)
-      const aesKey = await decryptAESKeyFromEncryptedSymKey(rec.encKey, wallet);
+      // ✅ same method you already use (encKey JSON contains forPatient/forDoctor)
+      const aesKey = decryptAESKeyFromEncryptedSymKey(rec.encKey, wallet);
 
       const resp = await axios.get(IPFS_GET(rec.ipfsCid), { responseType: "text" });
       const ciphertext = resp.data;
 
-      // ✅ v2: async AES-GCM decrypt (and still supports legacy v1)
-      const blob = await decryptCiphertextToBlob(ciphertext, aesKey, "application/pdf");
+      const blob = decryptCiphertextToBlob(ciphertext, aesKey, "application/pdf");
       const url = URL.createObjectURL(blob);
       window.open(url, "_blank");
     } catch (e) {
@@ -98,18 +96,8 @@ export default function ViewRecords({ records, metaMap, busy, onRefresh }) {
           </div>
 
           <div style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center" }}>
-            <input
-              className="search"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search for record..."
-            />
-
-            {typeof onRefresh === "function" ? (
-              <button className="btn btn-soft" type="button" onClick={onRefresh} disabled={!!busy}>
-                Refresh
-              </button>
-            ) : null}
+            <input className="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search for record..." />
+           
           </div>
         </div>
 
@@ -142,9 +130,10 @@ export default function ViewRecords({ records, metaMap, busy, onRefresh }) {
                   </div>
 
                   <div className="record-actions">
-                    <button className="btn btn-soft" type="button" onClick={() => viewAndDecrypt(r)} disabled={!!busy}>
-                      View
+                    <button className="btn btn-soft" type="button" onClick={() => viewAndDecrypt(r)}>
+                      View 
                     </button>
+                   
                   </div>
                 </div>
               );

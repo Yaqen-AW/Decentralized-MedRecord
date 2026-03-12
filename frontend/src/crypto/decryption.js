@@ -1,14 +1,12 @@
-// frontend/src/crypto/decryption.js
-// Thin wrapper kept for compatibility with existing imports.
-
+// src/crypto/decryption.js
 import { decryptKeyForWallet, extractAesKeyFromEncryptedSymKey } from "./fileEncryption";
 
-// Legacy (v1): walletAddress used as password
+// Backward-compatible
 export function decryptAESKeyWithWalletSecret(encryptedKey, walletAddress) {
   return decryptKeyForWallet(encryptedKey, walletAddress);
 }
 
-// ✅ New (v2): uses MetaMask eth_decrypt (async)
-export async function decryptAESKeyFromEncryptedSymKey(encKeyJson, walletAddress) {
-  return await extractAesKeyFromEncryptedSymKey(encKeyJson, walletAddress);
+// New (compact contract): encKey JSON contains forDoctor/forPatient
+export function decryptAESKeyFromEncryptedSymKey(encKeyJson, walletAddress) {
+  return extractAesKeyFromEncryptedSymKey(encKeyJson, walletAddress);
 }

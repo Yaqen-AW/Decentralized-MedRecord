@@ -56701,12 +56701,12 @@
     "1337": {
       "events": {},
       "links": {},
-      "address": "0x1400F5A7C85998543fb687A138525C06A17261F3",
-      "transactionHash": "0x44643cfea5529141ae8c57ba3f1df3274302734b9c8452d58e904feefb8be890"
+      "address": "0x9E089838633d37F50Ae168f609c9D17F92b4d740",
+      "transactionHash": "0x8498483ba6da584b9b2f20c033258a21ca9aba674d1480a4f0d40695467fb168"
     }
   },
   "schemaVersion": "3.4.16",
-  "updatedAt": "2026-03-12T04:00:36.858Z",
+  "updatedAt": "2026-03-12T21:23:37.906Z",
   "networkType": "ethereum",
   "devdoc": {
     "kind": "dev",

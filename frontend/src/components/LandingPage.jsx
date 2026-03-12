@@ -51,7 +51,7 @@ export default function LandingPage({ onGetStarted, stats }) {
   const [contactMessage, setContactMessage] = useState("");
 
   // حطي إيميلك هنا 👇
-  const CONTACT_EMAIL = "your.email@example.com";
+  const CONTACT_EMAIL = "medicalrecords855@gmail.com";
 
   const formatNumber = (n) => {
     const nn = toSafeNumber(n);
@@ -122,7 +122,7 @@ export default function LandingPage({ onGetStarted, stats }) {
           </button>
 
           <div className="font-semibold text-slate-800 tracking-tight">
-            MedRechain
+            MedReChain
           </div>
 
           <div className="w-8" />
@@ -298,8 +298,8 @@ export default function LandingPage({ onGetStarted, stats }) {
                 Secure Medical Records
               </span>
 
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold leading-tight">
-                Own your medical record.
+              <h1 className="text-1xl sm:text-2xl lg:text-2xl font-bold leading-tight">
+                Decentralized Medical Records for Secure Healthcare.
               </h1>
 
               <p className="text-slate-700 text-sm sm:text-base max-w-xl">

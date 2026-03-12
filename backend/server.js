@@ -14,7 +14,7 @@ const app = express();
 const upload = multer({ dest: "uploads/" });
 
 app.use(cors());
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "25mb" }));
 
 // Ensure uploads dir exists
 fs.mkdirSync("uploads", { recursive: true });
@@ -72,7 +72,7 @@ function rowToProfile(row) {
     profileHash: row.profile_hash || "",
     publicProfile,
     encryptedProfile: row.encrypted_profile || "",
-   
+
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -214,17 +214,22 @@ app.get("/ipfs/:cid", async (req, res) => {
 app.post("/emergency", async (req, res) => {
   try {
     const { nationalId, ciphertext } = req.body || {};
-    if (!nationalId || !ciphertext) {
-      return res.status(400).json({ error: "nationalId and ciphertext are required" });
+    if (!nationalId || !ciphertext || typeof ciphertext !== "string") {
+      return res.status(400).json({ error: "nationalId and ciphertext(string) are required" });
     }
+
     const h = nidHash(nationalId);
-    const tmpPath = `uploads/emergency_${h}.txt`;
+    const shortHash = h.slice(0, 10);
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const fileName = `emergency.txt`;
+    const tmpPath = `uploads/${fileName}`;
+
     fs.writeFileSync(tmpPath, String(ciphertext), "utf-8");
-    const cid = await uploadFileToPinata(tmpPath, `emergency_${h}.txt`);
+    const cid = await uploadFileToPinata(tmpPath, fileName);
     fs.unlinkSync(tmpPath);
 
     const idx = readIndex();
-    idx[h] = cid; // hash(nationalId) -> cid
+    idx[h] = cid;
     writeIndex(idx);
 
     res.json({ cid });

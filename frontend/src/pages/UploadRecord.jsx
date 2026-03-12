@@ -6,44 +6,32 @@ import {
   generateAesKey,
   encryptArrayBufferWithKey,
   buildEncryptedSymKey,
-  getEncryptionPublicKey,
 } from "../crypto/fileEncryption";
-
-const API_BASE = import.meta?.env?.VITE_BACKEND_URL || "http://localhost:5000";
-const UPLOAD_URL = `${API_BASE}/upload`;
 
 export default function UploadRecord() {
   const [patientId, setPatientId] = useState("");
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  async function fetchPatientEncPubKey(patientWallet) {
-    try {
-      const addr = String(patientWallet || "").toLowerCase();
-      const res = await fetch(`${API_BASE}/profiles/${addr}`);
-      if (!res.ok) return "";
-      const data = await res.json();
-
-      // backend returns: { address, role, profileHash, profile, ... }
-      const profile = data?.profile || data || {};
-      return (profile?.encryptionPublicKey || "").toString();
-    } catch {
-      return "";
-    }
-  }
-
   const handleUpload = async () => {
     const pid = Number(patientId);
-    if (!pid) return alert("Enter patientId first");
-    if (!file) return alert("Select a file first");
+    if (!pid) {
+      alert("Enter patientId first");
+      return;
+    }
+    if (!file) {
+      alert("Select a file first");
+      return;
+    }
 
     try {
       setLoading(true);
 
       // 1) accounts (doctor wallet)
-      const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-      const doctorWallet = accounts?.[0];
-      if (!doctorWallet) throw new Error("No wallet connected");
+      const accounts = await window.ethereum.request({
+        method: "eth_requestAccounts",
+      });
+      const doctorWallet = accounts[0];
 
       // 2) contract
       const contract = await getContract();
@@ -52,65 +40,66 @@ export default function UploadRecord() {
       const ok = await contract.accessGranted(pid, doctorWallet);
       if (!ok) {
         alert("No access for this patient. Request access and wait for approval first.");
+        setLoading(false);
         return;
       }
 
       // 4) get patient wallet from contract
       // patient struct in compact: Patient { wallet, nidHash, active, recordCnt, emergencyCnt }
       const p = await contract.patients(pid);
-      const patientWallet = (p?.wallet || p?.[0] || "").toString();
-      if (!patientWallet) return alert("Invalid patientId (patient wallet not found)");
-
-      // 5) patient encryption public key (stored off-chain in backend profile)
-      const patientEncPub = await fetchPatientEncPubKey(patientWallet);
-      if (!patientEncPub) {
-        alert("Patient must open Patient Dashboard and press Update Profile once (to save encryptionPublicKey).");
+      const patientWallet = p.wallet || p[0];
+      if (!patientWallet) {
+        alert("Invalid patientId (patient wallet not found)");
+        setLoading(false);
         return;
       }
 
-      // 6) doctor encryption public key (from wallet / MetaMask)
-      const doctorEncPub = await getEncryptionPublicKey(doctorWallet);
+      // 5) read file as ArrayBuffer
+      const reader = new FileReader();
+      reader.readAsArrayBuffer(file);
 
-      // 7) encrypt file with AES-256-GCM (v2)
-      const arrayBuffer = await file.arrayBuffer();
-      const aesKey = generateAesKey();
-      const encryptedFileText = await encryptArrayBufferWithKey(arrayBuffer, aesKey);
+      reader.onload = async () => {
+        try {
+          const arrayBuffer = reader.result;
 
-      // 8) encrypt AES key for BOTH (patient + doctor) using PUBLIC KEYS
-      const encryptedSymKey = buildEncryptedSymKey(aesKey, patientEncPub, doctorEncPub);
+          // 6) generate AES key + encrypt file
+          const aesKey = generateAesKey();
+          const encryptedFile = encryptArrayBufferWithKey(arrayBuffer, aesKey);
 
-      // 9) upload encrypted ciphertext to backend -> Pinata
-      const formData = new FormData();
-      formData.append("file", new Blob([encryptedFileText], { type: "text/plain" }), "encrypted.txt");
+          // 7) encrypt AES key for BOTH (patient + doctor) and store as JSON
+          const encryptedSymKey = buildEncryptedSymKey(aesKey, patientWallet, doctorWallet);
 
-      const resp = await axios.post(UPLOAD_URL, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+          // 8) upload encrypted ciphertext to backend -> Pinata
+          const formData = new FormData();
+          formData.append(
+            "file",
+            new Blob([encryptedFile], { type: "text/plain" }),
+            "encrypted.txt"
+          );
 
-      const cid = resp.data?.cid;
-      if (!cid) throw new Error("Backend did not return CID");
+          // ✅ خلي نفس endpoint متاعك
+          const resp = await axios.post("http://localhost:5000/upload", formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
 
-      // 10) Save on-chain
-      const category = "Other";
-      const recName = file?.name || "Record";
-      const notes = "";
+          const cid = resp.data.cid;
+          if (!cid) throw new Error("Backend did not return CID");
 
-      if (typeof contract.addRecordEncrypted === "function") {
-        const tx = await contract.addRecordEncrypted(patientWallet, category, recName, cid, encryptedSymKey, notes);
-        await tx.wait();
-      } else if (typeof contract.addRecord === "function") {
-        // legacy fallback if exists
-        const tx = await contract.addRecord(pid, cid, encryptedSymKey);
-        await tx.wait();
-      } else {
-        throw new Error("Contract method not found (addRecordEncrypted/addRecord)");
-      }
+          // 9) call contract.addRecord(patientId, cid, encryptedSymKey)
+          const tx = await contract.addRecord(pid, cid, encryptedSymKey);
+          await tx.wait();
 
-      alert("✅ Encrypted file uploaded to IPFS & recorded on blockchain");
+          alert("✅ Encrypted file uploaded to IPFS & recorded on blockchain");
+          setLoading(false);
+        } catch (innerErr) {
+          console.error(innerErr);
+          alert("Upload failed (encryption or blockchain error)");
+          setLoading(false);
+        }
+      };
     } catch (err) {
       console.error(err);
-      alert(err?.message ? `Upload failed: ${err.message}` : "Upload failed");
-    } finally {
+      alert("Upload failed");
       setLoading(false);
     }
   };

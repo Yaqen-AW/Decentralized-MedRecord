@@ -1,13 +1,8 @@
 import React, { useMemo, useState } from "react";
 import axios from "axios";
 import { getContract } from "../blockchain/contract";
-import {
-  generateAesKey,
-  encryptArrayBufferWithKey,
-  decryptCiphertextToBlob,
-  buildEncryptedSymKey,
-  getEncryptionPublicKey,
-} from "../crypto/fileEncryption";
+import { generateAesKey, encryptArrayBufferWithKey, buildEncryptedSymKey } from "../crypto/fileEncryption";
+import { decryptCiphertextToBlob } from "../crypto/fileEncryption";
 import { decryptAESKeyFromEncryptedSymKey } from "../crypto/decryption";
 import "../admin.css";
 
@@ -92,13 +87,13 @@ export default function DoctorViewRecords({
   async function decryptAndPreview(r) {
     try {
       setBusy(true);
-      const aesKey = await decryptAESKeyFromEncryptedSymKey(r.encKey, wallet);
+      const aesKey = decryptAESKeyFromEncryptedSymKey(r.encKey, wallet);
 
       const resp = await axios.get(IPFS_GET(r.ipfsCid), { responseType: "text" });
       const ciphertext = resp.data;
 
       // default type (works for PDF/images in browser iframe)
-      const blob = await decryptCiphertextToBlob(ciphertext, aesKey, "application/pdf");
+      const blob = decryptCiphertextToBlob(ciphertext, aesKey, "application/pdf");
       const url = URL.createObjectURL(blob);
 
       setPreviewTitle(`${normalizeCategory(r.category)} • Record #${r.id}`);
@@ -125,17 +120,10 @@ export default function DoctorViewRecords({
       // encrypt file
       const buf = await file.arrayBuffer();
       const aesKey = generateAesKey();
-      const ciphertext = await encryptArrayBufferWithKey(buf, aesKey);
+      const ciphertext = encryptArrayBufferWithKey(buf, aesKey);
 
-      // encrypt aes key for patient + doctor (PUBLIC KEY)
-      const patientMeta = metaMap?.get((patientWallet || "").toLowerCase()) || {};
-      const patientEncPub = patientMeta?.encryptionPublicKey;
-      if (!patientEncPub) {
-        throw new Error("Patient encryptionPublicKey not found. Patient must update profile once.");
-      }
-
-      const doctorEncPub = await getEncryptionPublicKey(wallet);
-      const encKey = buildEncryptedSymKey(aesKey, patientEncPub, doctorEncPub);
+      // encrypt aes key for patient + doctor
+      const encKey = buildEncryptedSymKey(aesKey, patientWallet, wallet);
 
       // upload to IPFS via backend
       const form = new FormData();
@@ -152,149 +140,237 @@ export default function DoctorViewRecords({
           recName.trim(),
           cid,
           encKey,
-          notes?.trim?.() || ""
+          notes.trim()
         )
-      ).wait?.();
+      ).wait();
 
-      // reset modal
       setAddOpen(false);
-      setCategory("X-Rays");
       setRecName("");
       setNotes("");
       setFile(null);
 
+      await onRefreshAccess?.();
       await loadRecords();
       onRecordAdded?.();
-      alert("✅ Record added.");
+
+      alert("Record added ✅");
     } catch (e) {
       console.error(e);
-      alert(e?.message ? e.message : "Add record failed.");
+      alert(e?.message || "Upload failed.");
     } finally {
       setBusy(false);
     }
   }
 
-  // auto-load when patient changes
-  React.useEffect(() => {
-    loadRecords();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [patientWallet, hasAccess]);
-
   return (
-    <div style={{ width: "100%" }}>
-      <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
-        <button className="btn" disabled={busy} onClick={onRefreshAccess}>
-          Refresh Access
-        </button>
-        <button className="btn-primary" disabled={busy || !hasAccess} onClick={() => setAddOpen(true)}>
-          + Add Record
-        </button>
-        <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
-          <span style={{ fontSize: 12, opacity: 0.75 }}>Filter:</span>
-          <select value={filter} onChange={(e) => setFilter(e.target.value)}>
-            <option>All</option>
-            <option>X-Rays</option>
-            <option>Medical tests</option>
-            <option>Dr. Consultation</option>
-            <option>Drugs</option>
-            <option>Other</option>
-          </select>
+    <div className="board">
+      <div className="board-head" style={{ justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        <div>
+          <div className="board-title">Patient Records</div>
+          <div className="muted" style={{ fontSize: 12 }}>
+            {hasAccess ? "Access granted. You can view and add records." : "Access is required to view records."}
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <button className="btn btn-soft" onClick={loadRecords} disabled={busy || !hasAccess}>
+            Refresh
+          </button>
+
+          <button className="btn btn-primary" onClick={() => setAddOpen(true)} disabled={busy || !hasAccess}>
+            + Add New Record
+          </button>
         </div>
       </div>
 
-      {/* Records list */}
-      <div className="table-wrap">
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Category</th>
-              <th>Name</th>
-              <th>Created</th>
-              <th>IPFS</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((r) => (
-              <tr key={r.id}>
-                <td>{r.id}</td>
-                <td>{normalizeCategory(r.category)}</td>
-                <td>{r.recName}</td>
-                <td>{r.createdAt ? new Date(r.createdAt * 1000).toLocaleDateString() : ""}</td>
-                <td style={{ maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis" }}>{r.ipfsCid}</td>
-                <td>
-                  <button className="btn" disabled={busy} onClick={() => decryptAndPreview(r)}>
-                    Preview
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {!filtered.length && (
-              <tr>
-                <td colSpan={6} style={{ opacity: 0.75 }}>
-                  No records.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+      {/* category tabs */}
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+        {["All", "Medical tests", "X-Rays", "Drugs", "Dr. Consultation"].map((t) => (
+          <button
+            key={t}
+            className={`btn btn-soft ${filter === t ? "active" : ""}`}
+            type="button"
+            onClick={() => setFilter(t)}
+            style={{ padding: "6px 12px", fontSize: 12 }}
+          >
+            {t}
+          </button>
+        ))}
       </div>
 
-      {/* Add modal */}
-      {addOpen && (
-        <div className="modal-backdrop">
-          <div className="modal">
-            <h3 style={{ marginTop: 0 }}>Add New Record</h3>
+      {!hasAccess ? (
+        <div className="empty">No access yet. Request access and wait for approval.</div>
+      ) : filtered.length === 0 ? (
+        <div className="empty">{busy ? "Loading..." : "No records found."}</div>
+      ) : (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+            gap: 12,
+          }}
+        >
+          {filtered.map((r) => (
+            <div key={r.id} className="board" style={{ padding: 12 }}>
+              <div style={{ fontWeight: 900, marginBottom: 6 }}>{normalizeCategory(r.category)}</div>
+              <div style={{ fontSize: 13, color: "rgba(11,36,71,0.80)" }}>
+                <b>Record:</b> {r.recName || "—"}
+              </div>
+              <div style={{ fontSize: 12, color: "rgba(11,36,71,0.65)", marginTop: 6 }}>
+                <div><b>From:</b> <span className="mono">{r.doctor?.slice(0, 10)}...{r.doctor?.slice(-6)}</span></div>
+                <div><b>Date:</b> {r.createdAt ? new Date(r.createdAt * 1000).toLocaleDateString() : "—"}</div>
+              </div>
 
-            <label>Category</label>
-            <select value={category} onChange={(e) => setCategory(e.target.value)}>
-              <option>X-Rays</option>
-              <option>Medical tests</option>
-              <option>Dr. Consultation</option>
-              <option>Drugs</option>
-              <option>Other</option>
-            </select>
+              <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button className="btn btn-primary" onClick={() => decryptAndPreview(r)} disabled={busy}>
+                  View
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
-            <label style={{ marginTop: 10 }}>Record name</label>
-            <input value={recName} onChange={(e) => setRecName(e.target.value)} placeholder="Short description" />
-
-            <label style={{ marginTop: 10 }}>Notes (optional)</label>
-            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
-
-            <label style={{ marginTop: 10 }}>File</label>
-            <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} />
-
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 14 }}>
-              <button className="btn" disabled={busy} onClick={() => setAddOpen(false)}>
-                Cancel
+      {/* Add record modal */}
+      {addOpen ? (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            background: "rgba(15, 23, 42, 0.18)",
+            backdropFilter: "blur(2px)",
+          }}
+          onClick={() => setAddOpen(false)}
+        >
+          <div
+            style={{
+              position: "fixed",
+              top: 92,
+              left: "50%",
+              transform: "translateX(-50%)",
+              width: "min(980px, 92vw)",
+              maxHeight: "75vh",
+              overflow: "auto",
+              background: "rgba(255,255,255,0.95)",
+              border: "1px solid rgba(2,132,199,0.18)",
+              borderRadius: 16,
+              boxShadow: "0 18px 50px rgba(15, 76, 129, 0.18)",
+              padding: 14,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 10 }}>
+              <div style={{ fontWeight: 900 }}>Record Information</div>
+              <button
+                type="button"
+                onClick={() => setAddOpen(false)}
+                aria-label="Close"
+                style={{ border: "none", background: "transparent", fontSize: 22, fontWeight: 900, cursor: "pointer" }}
+              >
+                ×
               </button>
-              <button className="btn-primary" disabled={busy} onClick={uploadNewRecord}>
-                {busy ? "Saving..." : "Encrypt & Save"}
-              </button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: 14 }}>
+              <div className="board" style={{ padding: 12 }}>
+                <div className="muted" style={{ fontSize: 12 }}>Category</div>
+                <select className="search" value={category} onChange={(e) => setCategory(e.target.value)} style={{ width: "100%" }}>
+                  <option>X-Rays</option>
+                  <option>Medical tests</option>
+                  <option>Drugs</option>
+                  <option>Dr. Consultation</option>
+                  <option>Other</option>
+                </select>
+
+                <div className="muted" style={{ fontSize: 12, marginTop: 10 }}>Record Name / Description</div>
+                <input className="search" value={recName} onChange={(e) => setRecName(e.target.value)} placeholder="e.g. There is a crack in the thumb..." />
+
+                <div className="muted" style={{ fontSize: 12, marginTop: 10 }}>Notes for Patient</div>
+                <textarea
+                  className="search"
+                  style={{ width: "100%", minHeight: 120 }}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="- take a rest for a month..."
+                />
+                <div className="muted" style={{ fontSize: 12, marginTop: 10 }}>
+                  Patient ID: <b>#{patientId}</b> • Patient PK: <span className="mono">{patientWallet?.slice(0, 10)}...{patientWallet?.slice(-6)}</span>
+                </div>
+              </div>
+
+              <div className="board" style={{ padding: 12 }}>
+                <div style={{ fontWeight: 900, marginBottom: 8 }}>Upload Record Data</div>
+                <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+                <div className="muted" style={{ fontSize: 12, marginTop: 10 }}>
+                  File will be encrypted locally (AES) then uploaded to IPFS. CID + encrypted key stored on-chain.
+                </div>
+
+                <div style={{ marginTop: 12 }}>
+                  <button className="btn btn-primary" onClick={uploadNewRecord} disabled={busy}>
+                    {busy ? "Working..." : "Add"}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Preview modal */}
-      {previewOpen && (
-        <div className="modal-backdrop" onClick={() => setPreviewOpen(false)}>
-          <div className="modal" style={{ width: "min(980px, 95vw)", height: "min(80vh, 720px)" }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-              <h3 style={{ margin: 0, flex: 1 }}>{previewTitle}</h3>
-              <button className="btn" onClick={() => setPreviewOpen(false)}>
-                Close
+      {previewOpen ? (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            background: "rgba(15, 23, 42, 0.18)",
+            backdropFilter: "blur(2px)",
+          }}
+          onClick={() => {
+            setPreviewOpen(false);
+            setPreviewUrl("");
+          }}
+        >
+          <div
+            style={{
+              position: "fixed",
+              top: 92,
+              left: "50%",
+              transform: "translateX(-50%)",
+              width: "min(1100px, 94vw)",
+              maxHeight: "78vh",
+              overflow: "hidden",
+              background: "rgba(255,255,255,0.95)",
+              border: "1px solid rgba(2,132,199,0.18)",
+              borderRadius: 16,
+              boxShadow: "0 18px 50px rgba(15, 76, 129, 0.18)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: 12 }}>
+              <div style={{ fontWeight: 900 }}>{previewTitle}</div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPreviewOpen(false);
+                  setPreviewUrl("");
+                }}
+                style={{ border: "none", background: "transparent", fontSize: 22, fontWeight: 900, cursor: "pointer" }}
+              >
+                ×
               </button>
             </div>
-            {previewUrl ? (
-              <iframe title="preview" src={previewUrl} style={{ width: "100%", height: "100%", border: 0, borderRadius: 12 }} />
-            ) : (
-              <div>Loading...</div>
-            )}
+            <div style={{ height: "calc(78vh - 54px)", background: "#fff" }}>
+              {previewUrl ? (
+                <iframe title="preview" src={previewUrl} style={{ width: "100%", height: "100%", border: 0 }} />
+              ) : (
+                <div className="empty">No preview</div>
+              )}
+            </div>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
