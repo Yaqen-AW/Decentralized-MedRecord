@@ -1,0 +1,443 @@
+/* frontend/src/App.css */
+
+.app-root {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #1a202c;
+}
+
+/* Topbar */
+.topbar {
+  padding: 8px 16px;
+  background: #0b3c78;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.topbar-title {
+  font-weight: 600;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.topbar-btn {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #c3dafe;
+  background: transparent;
+  color: #e2e8f0;
+  cursor: pointer;
+}
+
+/* Dashboards */
+
+.dashboard-root {
+  padding: 24px;
+  max-width: 960px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.dashboard-title {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.dashboard-subtitle {
+  margin-bottom: 16px;
+}
+
+.dashboard-id-box {
+  padding: 10px 14px;
+  background: #edf2f7;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.tabs-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 20px 0;
+}
+
+.tab-btn {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid #cbd5f5;
+  background: #f7fafc;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.tab-btn.active {
+  background: #3182ce;
+  color: #fff;
+  border-color: #2b6cb0;
+}
+
+.dashboard-content {
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Requests list in HospitalDashboard */
+.request-list {
+  list-style: none;
+  padding: 0;
+}
+
+.request-item {
+  margin-bottom: 12px;
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  max-width: 500px;
+}
+
+.request-status {
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #ebf8ff;
+}
+
+/* Generic primary button (shared with landing if needed) */
+.primary-btn {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: none;
+  background: #3182ce;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* ===== Landing layout – soft white / medical theme ===== */
+
+.landing-root {
+  min-height: 100vh;
+  background: radial-gradient(circle at top left, #f0f7ff 0, #ffffff 40%, #f7f8fc 100%);
+  color: #111827;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* Top navbar */
+.landing-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 60px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.landing-logo {
+  font-weight: 700;
+  font-size: 20px;
+  color: #0284c7;
+}
+
+.landing-nav-links {
+  display: flex;
+  gap: 20px;
+}
+
+.landing-nav-link {
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  color: #4b5563;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.landing-nav-link:hover {
+  color: #0284c7;
+}
+
+/* Main area */
+.landing-main {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 40px 20px 80px;
+}
+
+/* Hero section */
+.landing-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 40px;
+  align-items: center;
+  margin-bottom: 40px;
+}
+
+.landing-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.landing-hero-title {
+  font-size: 32px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 12px;
+}
+
+.landing-hero-subtitle {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #4b5563;
+  margin-bottom: 24px;
+}
+
+.landing-hero-button {
+  padding: 10px 26px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, #0284c7, #0ea5e9);
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 10px 20px rgba(37, 99, 235, 0.25);
+}
+
+.landing-hero-button:hover {
+  filter: brightness(1.05);
+}
+
+/* Hero illustration / image */
+.landing-hero-illustration {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.landing-image-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  border-radius: 24px;
+  background: linear-gradient(145deg, #0ea5e9, #22c1c3);
+  padding: 16px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+}
+
+.landing-hero-image {
+  width: 100%;
+  border-radius: 20px;
+  object-fit: cover;
+  display: block;
+}
+
+.landing-image-placeholder {
+  position: absolute;
+  inset: 16px;
+  border-radius: 20px;
+  padding: 18px;
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.8), rgba(15, 23, 42, 0.6));
+  color: #f9fafb;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.landing-image-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.landing-image-text {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #e5e7eb;
+}
+
+/* Feature cards */
+.landing-features {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 32px;
+}
+
+.feature-card {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 18px 18px 20px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+  border: 1px solid #e5e7eb;
+}
+
+.feature-card h3,
+.feature-card h4 {
+  margin: 0 0 8px;
+  color: #0f172a;
+}
+
+.feature-card p {
+  margin: 0;
+  font-size: 13px;
+  color: #4b5563;
+  line-height: 1.6;
+}
+
+.feature-main {
+  grid-row: span 2;
+}
+
+/* Stats counters row */
+.landing-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 32px;
+}
+
+.stats-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 14px 16px;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+  border: 1px solid #e5e7eb;
+  text-align: center;
+}
+
+.stats-number {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 4px;
+}
+
+.stats-label {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* Simple bar chart cards */
+.landing-charts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.chart-card {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 18px 18px 20px;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
+  border: 1px solid #e5e7eb;
+}
+
+.chart-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 14px;
+}
+
+.chart-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chart-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 40px;
+  align-items: center;
+  gap: 8px;
+}
+
+.chart-label {
+  font-size: 12px;
+  color: #4b5563;
+}
+
+.chart-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  overflow: hidden;
+}
+
+.chart-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.chart-bar-patients,
+.chart-bar-patients2 {
+  background: #0ea5e9;
+}
+
+.chart-bar-records {
+  background: #22c55e;
+}
+
+.chart-bar-hospitals {
+  background: #6366f1;
+}
+
+.chart-bar-doctors {
+  background: #ec4899;
+}
+
+.chart-value {
+  font-size: 12px;
+  text-align: right;
+  color: #111827;
+}
+
+/* Responsive tweaks */
+@media (max-width: 900px) {
+  .landing-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-hero-illustration {
+    justify-content: center;
+  }
+
+  .landing-features {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .feature-main {
+    grid-row: auto;
+  }
+
+  .landing-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .landing-charts {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-header {
+    padding: 14px 20px;
+  }
+}
