@@ -1,4 +1,4 @@
-# MedReChain – Blockchain-Based Medical Record Management System
+# Decentralizing Electronic Health Records Using Blockchain Technology for Improved Patient Care
 
 ## Overview
 MedReChain is a blockchain-based healthcare management system designed to provide secure, transparent, and decentralized management of electronic medical records (EMRs). The system improves data privacy, access control, and integrity by combining blockchain technology with encrypted off-chain storage.
