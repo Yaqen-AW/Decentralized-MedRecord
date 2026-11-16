@@ -5,6 +5,8 @@ MedReChain is a blockchain-based healthcare management system designed to provid
 
 This project was developed as a graduation project in Electrical and Electronic Engineering, focusing on applying blockchain technology in healthcare systems.
 
+## Project Report
+[Download the full report (PDF)](Project-Report.pdf)
 
 # Project Objectives
 
